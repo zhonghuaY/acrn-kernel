@@ -258,6 +258,7 @@ static int ext_device_setup_node(void* ipu_data,
 	struct ici_isys *isys = ipu_data;
 	sd->node.sd = sd;
 	sd->node.external = true;
+
 	rval = ici_isys_pipeline_node_init(
 		isys, &sd->node, name, sd->num_pads, sd->pads);
 	if (rval)
@@ -286,20 +287,18 @@ static int isys_complete_ext_device_registration(
 		return rval;
 	}
 	if (csi2) {
-        for (i = 0; i < NR_OF_CSI2_VC; i++) {
-            rval = node_pad_create_link(&sd->node, sd->src_pad,
-                    &isys->ici_csi2[csi2->port].asd[i].node,
-                    CSI2_ICI_PAD_SINK, 0);
-            if (rval) {
-                dev_warn(&isys->adev->dev,
-                        "can't create link from external node\n");
-                return rval;
-            }
-
-            isys->ici_csi2[csi2->port].nlanes = csi2->nlanes;
-            isys->ici_csi2[csi2->port].ext_sd = sd;
-        }
-    }
+		for (i = 0; i < NR_OF_CSI2_VC; i++) {
+			rval = sd_register.create_link(&sd->node, sd->src_pad,
+				&isys->ici_csi2[csi2->port].asd[i].node,
+				CSI2_ICI_PAD_SINK, 0);
+			if (rval) {
+				dev_warn(&isys->adev->dev,
+					"can't create link from external node\n");
+			}
+			isys->ici_csi2[csi2->port].nlanes = csi2->nlanes;
+			isys->ici_csi2[csi2->port].ext_sd = sd;
+		}
+	}
 	return 0;
 }
 
@@ -387,7 +386,6 @@ static int isys_register_ext_subdev(struct ici_isys *isys,
 		rval = -EINVAL;
 		goto skip_put_adapter;
 	}
-
 	return isys_complete_ext_device_registration(isys, sd, sd_info->csi2);
 
 skip_put_adapter:
@@ -581,7 +579,7 @@ static int isys_register_devices(struct ici_isys *isys)
 		dev_info(&isys->pipeline_dev.dev, "can't register pipeline device\n");
 		return rval;
 	}
-
+	dev_info(&isys->pipeline_dev.dev,"@%s\n",__func__);
 	rval = isys_register_subdevices(isys);
 	if (rval)
 		goto out_pipeline_device_unregister;
