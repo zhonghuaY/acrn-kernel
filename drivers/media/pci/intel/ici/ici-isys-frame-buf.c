@@ -595,9 +595,9 @@ int ici_isys_put_buf(struct ici_isys_stream *as,
 			rval = wait_event_interruptible(buf_list->wait,
 							!list_empty(&buf_list->
 								putbuf_list));
-			spin_lock_irqsave(&buf_list->lock, flags);
 			if (rval == -ERESTARTSYS)
 				return rval;
+			spin_lock_irqsave(&buf_list->lock, flags);
 		}
 	}
 
@@ -606,16 +606,21 @@ int ici_isys_put_buf(struct ici_isys_stream *as,
 		return -ENODATA;
 	}
 
-	buf = list_entry(buf_list->putbuf_list.next,
-			struct ici_frame_buf_wrapper, node);
-	list_del(&buf->node);
-
-	buf->state = ICI_BUF_DONE;
-	list_add_tail(&buf->node,
-						&buf_list->getbuf_list);
+	// FIXME: This is different from ICG V4L2 implementation which uses time stamp
+  	// to sort frames
+	list_for_each_entry(buf, &buf_list->putbuf_list, node) {
+		if (buf->state == ICI_BUF_READY  && buf->frame_info.frame_buf_id ==
+			frame_info->frame_buf_id) {
+			list_del(&buf->node);
+			memcpy(frame_info, &buf->frame_info, sizeof(buf->frame_info));
+			buf->state = ICI_BUF_DONE;
+			list_add_tail(&buf->node,
+				&buf_list->getbuf_list);
+			break;
+		}
+	}
 	spin_unlock_irqrestore(&buf_list->lock, flags);
 
-	memcpy(frame_info, &buf->frame_info, sizeof(buf->frame_info));
 	return 0;
 }
 
