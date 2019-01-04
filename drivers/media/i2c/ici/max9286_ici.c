@@ -489,8 +489,8 @@ static int init_ext_sd(struct i2c_client *client, struct max9286_subdev *max_sd,
 {
 	struct max9286 *max;
 	int rval;
-	struct ici_ext_subdev *subdev = i2c_get_clientdata(client);;
         char name[ICI_MAX_NODE_NAME];
+	struct ici_ext_subdev *subdev = i2c_get_clientdata(client);;
 
 	max = to_max_9286(subdev);
 
