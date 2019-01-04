@@ -487,10 +487,12 @@ static int max9286_get_selection(struct ici_isys_node *node, struct ici_pad_sele
 
 static int init_ext_sd(struct i2c_client *client, struct max9286_subdev *max_sd, int idx)
 {
-        int rval;
+	struct max9286 *max;
+	int rval;
 	struct ici_ext_subdev *subdev = i2c_get_clientdata(client);;
-	struct max9286 *max = to_max_9286(subdev);
         char name[ICI_MAX_NODE_NAME];
+
+	max = to_max_9286(subdev);
 
         snprintf(name, sizeof(name), "MAX9286 %d", idx);
 
@@ -593,6 +595,9 @@ static int max9286_registered(struct ici_ext_subdev_register *reg)
 	subdev->get_menu_item = max9286_get_menu_item;
 
 	for (i = 0, k = 0; (i < num) && (k < nsinks); i++, k++) {
+		struct i2c_client *client2;
+		struct ici_ext_subdev *sensor_sd;
+		struct ici_ext_subdev_register sd_register = {0};
 		struct max9286_subdev_i2c_info *info =
 			&max->pdata->subdev_info[i];
 		struct crlmodule_lite_platform_data *pdata =
@@ -609,10 +614,6 @@ static int max9286_registered(struct ici_ext_subdev_register *reg)
 
 		max->subdev_pdata[i].suffix = info->suffix;
 		info->board_info.platform_data = &max->subdev_pdata[i];
-
-		struct i2c_client *client2;
-		struct ici_ext_subdev *sensor_sd;
-		struct ici_ext_subdev_register sd_register = {0};
 
 		request_module(I2C_MODULE_PREFIX "%s", info->board_info.type);
 
@@ -708,7 +709,7 @@ static int max9286_register_subdev(struct max9286 *max, struct i2c_client *clien
  * bits[3:2] 01: Link 1 is 2nd in the CSI-2 output order
  * bits[1:0] 00: Link 0 is 1st in the CSI-2 output order
  */
-u8 get_output_link_order(struct max9286 *max)
+static u8 get_output_link_order(struct max9286 *max)
 {
 	u8 val = 0xE4, i;
 	u8 order_config[14][3] = {
