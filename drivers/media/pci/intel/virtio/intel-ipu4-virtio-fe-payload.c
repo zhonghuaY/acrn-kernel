@@ -37,6 +37,7 @@ void intel_ipu4_virtio_create_req(struct ipu4_virtio_req *req,
 	case IPU4_CMD_GET_FRAMEFMT:
 	case IPU4_CMD_GET_SUPPORTED_FRAMEFMT:
 	case IPU4_CMD_SET_SELECTION:
+	case IPU4_CMD_SET_CONTROL:
 	case IPU4_CMD_GET_SELECTION:
 		/* Open video device node
 		 * op0 - virtual device node number

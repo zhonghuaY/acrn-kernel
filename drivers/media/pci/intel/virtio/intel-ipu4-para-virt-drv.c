@@ -1074,6 +1074,7 @@ static long virt_pipeline_ioctl_common(void __user *up,
 			format_desc;
 		struct ici_links_query links_query;
 		struct ici_pad_selection pad_sel;
+		struct ici_pad_ctl pad_ctl;
 	};
 	int err = 0;
 	union isys_ioctl_cmd_args *data = NULL;
@@ -1130,6 +1131,11 @@ static long virt_pipeline_ioctl_common(void __user *up,
 		pr_debug("virt_pipeline_ioctl: ICI_IOC_GET_SELECTION\n");
 		err = process_pipeline(file, g_fe_priv,
 			(void *)&data->pad_sel, IPU4_CMD_GET_SELECTION);
+		break;
+	case ICI_IOC_SET_CONTROL:
+		pr_debug("virt_pipeline_ioctl: ICI_IOC_SET_CONTROL\n");
+		err = process_pipeline(file, g_fe_priv,
+							   (void *)&data->pad_ctl, IPU4_CMD_SET_CONTROL);
 		break;
 	default:
 		err = -ENOTTY;

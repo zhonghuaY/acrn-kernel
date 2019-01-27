@@ -323,6 +323,44 @@ int process_pad_set_sel(struct ipu4_virtio_req_info *req_info)
 		return IPU4_REQ_PROCESSED;
 }
 
+int process_pad_set_ctl(struct ipu4_virtio_req_info *req_info)
+{
+	int err = 0;
+	struct ici_isys_pipeline_device *dev;
+	struct ici_pad_ctl *host_virt;
+	struct ipu4_virtio_req *req;
+	int domid = req_info->domid;
+
+	pr_debug("%s\n", __func__);
+
+	if (!pipeline) {
+		pr_err("%s: NULL pipeline", __func__);
+		return IPU4_REQ_ERROR;
+	}
+	dev = pipeline->private_data;
+
+	if (!req_info) {
+		pr_err("%s: NULL req_info", __func__);
+		return IPU4_REQ_ERROR;
+	}
+	req = req_info->request;
+
+	host_virt = map_guest_phys(domid, req->payload,
+						sizeof(struct ici_pad_ctl));
+	if (host_virt == NULL) {
+		pr_err("%s: NULL host_virt\n", __func__);
+		return IPU4_REQ_ERROR;
+	}
+	err = dev->pipeline_ioctl_ops->pad_set_ctl(pipeline, dev, host_virt);
+
+	unmap_guest_phys(domid, req->payload);
+	if (err)
+		return IPU4_REQ_ERROR;
+	else
+		return IPU4_REQ_PROCESSED;
+}
+
+
 int process_pad_get_sel(struct ipu4_virtio_req_info *req_info)
 {
 	int err = 0;
@@ -440,6 +478,17 @@ int process_pad_set_sel_thread(void *data)
 	do_exit(0);
 	return 0;
 }
+
+int process_pad_set_ctl_thread(void *data)
+{
+	int status;
+
+	status = process_pad_set_ctl(data);
+	notify_fe(status, data);
+	do_exit(0);
+	return 0;
+}
+
 
 int process_pad_get_sel_thread(void *data)
 {
