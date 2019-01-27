@@ -62,6 +62,8 @@ struct ici_isys_node {
 		struct ici_pad_selection* ps);
 	int (*node_get_pad_sel)(struct ici_isys_node* node,
 		struct ici_pad_selection* ps);
+	int (*node_set_pad_ctl)(struct ici_isys_node* node,
+		struct ici_pad_ctl* ctl);
 };
 
 enum ici_ext_sd_param_id {

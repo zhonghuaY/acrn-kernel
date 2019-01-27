@@ -47,6 +47,8 @@ struct ici_pipeline_ioctl_ops {
 			struct ici_pad_selection* pad_sel);
 	int (*pad_get_sel)(struct file *file, void *fh,
 			struct ici_pad_selection* pad_sel);
+	int (*pad_set_ctl)(struct file *file, void *fh,
+		struct ici_pad_ctl* ctl);
 };
 
 int pipeline_device_register(

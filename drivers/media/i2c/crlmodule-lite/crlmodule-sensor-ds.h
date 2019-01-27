@@ -318,6 +318,14 @@ union crl_ctrl_data_types {
 	struct crl_ctrl_data_menu_items menu_items;
 	struct crl_ctrl_data_int_menu int_menu;
 };
+struct crl_dep_reg_list {
+	enum crl_dep_ctrl_condition reg_cond;
+	struct crl_dynamic_entity cond_value;
+	unsigned int no_direct_regs;
+	struct crl_register_write_rep *direct_regs;
+	unsigned int no_dyn_items;
+	struct crl_dynamic_register_access *dyn_regs;
+};
 
 /*
  * Please note a difference in the usage of "regs" member in case of a
@@ -342,6 +350,9 @@ struct crl_ctrl_data {
 	struct crl_dynamic_register_access *regs;
 	unsigned int dep_items;
 	struct crl_dep_ctrl_provision *dep_ctrls;
+	unsigned int crl_ctrl_dep_reg_list; /* contains no. of dep_regs */
+	struct crl_dep_reg_list *dep_regs;
+	u32 crl_dep_reg_idx;
 	s64 min;
 	s64 max;
 	u64 step;
