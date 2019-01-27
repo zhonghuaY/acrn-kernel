@@ -127,13 +127,16 @@ static int crlmodule_i2c_write(struct crl_sensor *sensor, u16 dev_i2c_addr,
 
 	switch (len) {
 	case CRL_REG_LEN_08BIT:
+		val = val & 0xFF;
 		data_offset[0] = val;
 		break;
 	case CRL_REG_LEN_16BIT:
+		val = val & 0xFFFF;
 		data_offset[0] = val >> 8;
 		data_offset[1] = val;
 		break;
 	case CRL_REG_LEN_24BIT:
+		val = val & 0xFFFFFF;
 		data_offset[0] = val >> 16;
 		data_offset[1] = val >> 8;
 		data_offset[2] = val;
@@ -185,12 +188,14 @@ int crlmodule_write_regs(struct crl_sensor *sensor,
 	int ret;
 	u32 val;
 
+	dev_dbg(&client->dev,"--------------------------------------\n");
 	for (i = 0; i < len; i++) {
 		/*
 		 * Sensor setting sequence may need some delay.
 		 * delay value is specified by reg.val field
 		 */
 		if (regs[i].len == CRL_REG_LEN_DELAY) {
+			dev_dbg(&client->dev,"delay %d\n", regs[i].val);
 			msleep(regs[i].val);
 			continue;
 		}
@@ -205,6 +210,7 @@ int crlmodule_write_regs(struct crl_sensor *sensor,
 			ret = crlmodule_i2c_read(sensor, regs[i].dev_i2c_addr,
 				      regs[i].address,
 				      regs[i].len & CRL_REG_LEN_READ_MASK, &val);
+			dev_dbg(&client->dev,"read_and_update ret=%d", ret);
 			if (ret)
 				return ret;
 			val |= regs[i].val;

@@ -285,6 +285,22 @@ static int ici_pipeline_get_sel(struct file *file, void *fh,
 		return node->node_get_pad_sel(node, pad_sel);
 	return -ENODEV;
 }
+static int ici_pipeline_set_ctrl(struct file *file, void *fh,
+				struct ici_pad_ctl *pad_ctl)
+{
+	struct ici_isys_node *node;
+	struct ici_isys_pipeline_device *pipe_dev =
+			file->private_data;
+
+	node = find_node(pipe_dev, pad_ctl->pad.node_id);
+	if (!node)
+		return -ENODEV;
+
+	if (node->node_set_pad_ctl)
+		return node->node_set_pad_ctl(node, pad_ctl);
+	return -ENODEV;
+
+}
 
 static long ici_pipeline_ioctl_common(void __user *up,
 	struct file *file, unsigned int ioctl_cmd,
@@ -298,6 +314,7 @@ static long ici_pipeline_ioctl_common(void __user *up,
 			format_desc;
 		struct ici_links_query links_query;
 		struct ici_pad_selection pad_sel;
+		struct ici_pad_ctl pad_ctl;
 	} isys_ioctl_cmd_args;
 	int err = 0;
 	struct ici_isys_pipeline_device *pipe_dev =
@@ -347,7 +364,11 @@ static long ici_pipeline_ioctl_common(void __user *up,
 		break;
 	case ICI_IOC_GET_SELECTION:
 		err = ops->pad_get_sel(file, pipe_dev,
-			&isys_ioctl_cmd_args.pad_sel);
+							   &isys_ioctl_cmd_args.pad_sel);
+		break;
+	case ICI_IOC_SET_CONTROL:
+		err = ops->pad_set_ctl(file, pipe_dev,
+			&isys_ioctl_cmd_args.pad_ctl);
 		break;
 	default:
 		err = -ENOTTY;
@@ -401,7 +422,7 @@ static const struct ici_pipeline_ioctl_ops pipeline_ioctls =
 		ici_pipeline_get_supported_format,
 	.pad_set_sel = ici_pipeline_set_sel,
 	.pad_get_sel = ici_pipeline_get_sel,
-
+	.pad_set_ctl = ici_pipeline_set_ctrl,
 };
 
 static const struct file_operations ici_isys_pipeline_fops =

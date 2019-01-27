@@ -1376,6 +1376,35 @@ static void crlmodule_update_mode_ctrl(struct crl_sensor *sensor)
 	sensor->src->crop[CRL_PAD_SRC].height = this->height;
 }
 
+
+static int crlmodule_init_ctl(struct crl_sensor *sensor)
+{
+	int rval = 0;
+	const struct crl_ctrl_data *ctl;
+	struct crl_dep_reg_list *dep_regs;
+	struct i2c_client *client = sensor->src->sd.client;
+
+	dev_dbg(&client->dev, "%sctrl_enabl:%d, idx:%d\n",
+			__func__, sensor->ctrl_enable, sensor->ctrl_index);
+
+	ctl = &sensor->sensor_ds->ctrl_bank[sensor->ctrl_index];
+
+	if(sensor->ctrl_enable) {
+		/*update ctrl configurations*/
+		dep_regs = &ctl->dep_regs[ctl->crl_dep_reg_idx];
+		dev_dbg(&client->dev, "%s crl_ctl_dep_reg_idx=%d\n", __func__, ctl->crl_dep_reg_idx);
+		rval = crlmodule_write_regs(sensor, dep_regs->direct_regs
+									, dep_regs->no_direct_regs);
+		if (rval) {
+			dev_err(&client->dev, "%s failed to set crtl\n", __func__);
+			return rval;
+		}
+	}
+
+	return 0;
+}
+
+
 static void crlmodule_update_current_mode(struct crl_sensor *sensor)
 {
 	const struct crl_mode_rep *this;
@@ -1845,6 +1874,49 @@ static int crlmodule_set_selection(
 	return ret;
 }
 
+
+/*
+ * Function main code replicated from /drivers/media/i2c/smiapp/smiapp-core.c
+ * Slightly modified based on the CRL Module changes
+ */
+static int crlmodule_set_ctl(
+	struct ici_isys_node *node,
+	struct ici_pad_ctl* ctl)
+{
+	struct ici_ext_subdev *subdev = node->sd;
+	struct crl_sensor *sensor = to_crlmodule_sensor(subdev);
+	struct i2c_client *client = sensor->src->sd.client;
+	struct crl_ctrl_data *ctrl_bank;
+	struct crl_dep_reg_list *dep_regs;
+	int ret = 0, index = -1;
+
+	//ctrl_id, such as ICI_EXT_SD_PARAM_ID_TEST_PATTERN
+	dev_info(&client->dev, "%s sd_name: %s id: %d, value: %d",
+				   __func__, node->name, ctl->ctl_id,
+				   ctl->ctl_value);
+
+	mutex_lock(&sensor->mutex);
+	__crlmodule_get_crl_ctrl_index(sensor, ctl->ctl_id, &index);
+	dev_info(&client->dev, "%s sd_name: %s ctrl blank index: %d",
+			 __func__, node->name, index);
+	if(ctl->ctl_id == ICI_EXT_SD_PARAM_ID_TEST_PATTERN && index >=0) {
+		ctrl_bank = (struct crl_ctrl_data *) (&sensor->sensor_ds->ctrl_bank[index]);
+		ctrl_bank->crl_dep_reg_idx = ctl->ctl_value;
+		dep_regs = &ctrl_bank->dep_regs[ctl->ctl_value];
+		sensor->ctrl_index = index;
+		sensor->ctrl_enable = 1;
+		ret = crlmodule_write_regs(sensor, dep_regs->direct_regs
+			, dep_regs->no_direct_regs);
+		if (ret) {
+			dev_err(&client->dev, "%s failed to set plls\n", __func__);
+			return ret;
+		}
+	}
+	mutex_unlock(&sensor->mutex);
+	return ret;
+}
+
+
 static int crlmodule_start_streaming(struct crl_sensor *sensor)
 {
 	struct i2c_client *client = sensor->src->sd.client;
@@ -1852,9 +1924,9 @@ static int crlmodule_start_streaming(struct crl_sensor *sensor)
 	const struct crl_csi_data_fmt *fmt;
 	int rval;
 
-	dev_dbg(&client->dev, "%s start streaming pll_idx: %d fmt_idx: %d\n",
-				  __func__, sensor->pll_index,
-				  sensor->fmt_index);
+	dev_dbg(&client->dev, "%s start streaming pll_idx: %d fmt_idx: %d  ctrl_enabl:%d, idx:%d\n",
+			      __func__, sensor->pll_index,
+			      sensor->fmt_index, sensor->ctrl_enable, sensor->ctrl_index);
 
 	pll = &sensor->sensor_ds->pll_configs[sensor->pll_index];
 	fmt = &sensor->sensor_ds->csi_fmts[sensor->fmt_index];
@@ -1896,6 +1968,7 @@ static int crlmodule_start_streaming(struct crl_sensor *sensor)
 
 static int crlmodule_stop_streaming(struct crl_sensor *sensor)
 {
+	sensor->ctrl_enable = 0;
 	return crlmodule_write_regs(sensor,
 					sensor->sensor_ds->streamoff_regs,
 					sensor->sensor_ds->streamoff_regs_items);
@@ -2031,6 +2104,8 @@ static int crlmodule_run_poweron_init(struct crl_sensor *sensor)
 					  __func__);
 		return rval;
 	}
+
+	crlmodule_init_ctl(sensor);
 
 	/* Are we still initialising...? If yes, return here. */
 	if (!sensor->pixel_array)
@@ -2206,7 +2281,7 @@ static int crlmodule_set_power(
 	dev_err(&client->dev, "crlmodule_set_power %d\n", on);
 	if (on) {
 		ret = pm_runtime_get_sync(&client->dev);
-		dev_err(&client->dev, "crlmodule_set_power val %d\n", ret);
+		dev_err(&client->dev, "crlmodule_set_power pm_runtime_get_sync ret: %d\n", ret);
 		if (ret < 0) {
 			pm_runtime_put(&client->dev);
 			return ret;
@@ -2536,6 +2611,7 @@ static int init_ext_sd(struct i2c_client *client,
 		snprintf(name,
 			sizeof(name), "%s",
 			sensor->sensor_ds->subdevs[idx].name);
+	pr_info("%s@%d name:%s", __func__, __LINE__, name);
 	sd->client = client;
 	sd->num_pads = ssd->npads;
 	sd->src_pad = ssd->source_pad;
@@ -2556,7 +2632,7 @@ static int init_ext_sd(struct i2c_client *client,
 	sd->node.node_get_pad_ffmt = crlmodule_get_format;
 	sd->node.node_set_pad_sel = crlmodule_set_selection;
 	sd->node.node_get_pad_sel = crlmodule_get_selection;
-
+	sd->node.node_set_pad_ctl = crlmodule_set_ctl;
 	return 0;
 }
 
