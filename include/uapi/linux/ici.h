@@ -205,6 +205,6 @@ struct ici_links_query {
 #define ICI_IOC_GET_SUPPORTED_FRAMEFMT _IOWR(MAJOR_PIPELINE, 6, struct ici_pad_supported_format_desc)
 #define ICI_IOC_SET_SELECTION _IOWR(MAJOR_PIPELINE, 7, struct ici_pad_selection)
 #define ICI_IOC_GET_SELECTION _IOWR(MAJOR_PIPELINE, 8, struct ici_pad_selection)
-#define ICI_IOC_SET_CONTROL _IOWR(MAJOR_PIPELINE, 9, struct ici_pad_selection)
+#define ICI_IOC_SET_CONTROL _IOWR(MAJOR_PIPELINE, 9, struct ici_pad_ctl)
 
 #endif // _UAPI_LINUX_ICI_H

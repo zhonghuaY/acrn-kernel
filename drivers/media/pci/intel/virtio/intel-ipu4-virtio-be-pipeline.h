@@ -19,6 +19,7 @@ int process_get_supported_framefmt_thread(void *data);
 int process_set_framefmt_thread(void *data);
 int process_get_framefmt_thread(void *data);
 int process_pad_set_sel_thread(void *data);
+int process_pad_set_ctl_thread(void *data);
 int process_pad_get_sel_thread(void *data);
 int process_setup_pipe_thread(void *data);
 

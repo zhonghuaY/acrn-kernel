@@ -191,6 +191,13 @@ int intel_ipu4_virtio_msg_parse(struct ipu4_virtio_req_info *req_info)
 								"process_pad_set_sel");
 			req->stat = IPU4_REQ_PENDING;
 			break;
+	case IPU4_CMD_SET_CONTROL:
+			pr_debug("%s process_pad_set_ctl %d",
+						__func__, req->op[0]);
+			kthread_run(process_pad_set_ctl_thread, req_info,
+								"process_pad_set_ctl");
+			req->stat = IPU4_REQ_PENDING;
+			break;
 	case IPU4_CMD_GET_SELECTION:
 			pr_debug("%s process_pad_get_sel %d",
 						__func__, req->op[0]);

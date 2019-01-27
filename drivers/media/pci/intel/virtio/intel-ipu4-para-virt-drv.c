@@ -1126,6 +1126,11 @@ static long virt_pipeline_ioctl_common(void __user *up,
 		err = process_pipeline(file, g_fe_priv,
 			(void *)&data->pad_sel, IPU4_CMD_SET_SELECTION);
 		break;
+	case ICI_IOC_SET_CONTROL:
+		pr_debug("virt_pipeline_ioctl: ICI_IOC_SET_CONTROL\n");
+		err = process_pipeline(file, g_fe_priv,
+			(void *)&data->pad_sel, IPU4_CMD_SET_CONTROL);
+		break;		
 	case ICI_IOC_GET_SELECTION:
 		pr_debug("virt_pipeline_ioctl: ICI_IOC_GET_SELECTION\n");
 		err = process_pipeline(file, g_fe_priv,
