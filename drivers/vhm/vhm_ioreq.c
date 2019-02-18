@@ -257,7 +257,7 @@ int acrn_ioreq_create_client(unsigned long vmid, ioreq_handler_t handler,
 	list_add(&client->list, &vm->ioreq_client_list);
 	spin_unlock_bh(&vm->ioreq_client_lock);
 
-	pr_info("vhm-ioreq: created ioreq client %d\n", client_id);
+	pr_info("vhm-ioreq: created ioreq client %d for %s\n", client_id, name);
 
 	return client_id;
 }
@@ -402,6 +402,8 @@ void acrn_ioreq_destroy_client(int client_id)
 	if (!client)
 		return;
 
+	pr_info("vhm-ioreq: destroy ioreq client %d for %s\n", client->id, client->name);
+	
 	might_sleep();
 
 	acrn_ioreq_destroy_client_pervm(client, client->ref_vm);
