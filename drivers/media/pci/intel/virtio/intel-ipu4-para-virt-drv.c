@@ -878,7 +878,6 @@ static void base_device_release(struct device *sd)
 int virt_frame_buf_init(struct ici_isys_frame_buf_list *buf_list)
 {
 	buf_list->drv_priv = NULL;
-	mutex_init(&buf_list->mutex);
 	spin_lock_init(&buf_list->lock);
 	spin_lock_init(&buf_list->short_packet_queue_lock);
 	INIT_LIST_HEAD(&buf_list->getbuf_list);
