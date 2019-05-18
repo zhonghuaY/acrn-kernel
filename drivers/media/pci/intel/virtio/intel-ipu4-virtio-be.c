@@ -194,7 +194,7 @@ static void handle_vq_kick(int client_id, int vq_idx)
 			continue;
 		}
 
-		req_info = ipu4_virtio_be_req_queue_get();
+		req_info = kzalloc(sizeof(struct ipu4_virtio_req_info), GFP_KERNEL);
 		if (req_info) {
 			req = (struct ipu4_virtio_req *)iov.iov_base;
 			req_info->request = req;
@@ -428,7 +428,7 @@ int notify_fe(int status, struct ipu4_virtio_req_info *req_info)
 	virtio_vq_relchain(vq, req_info->vq_info.vq_buf_idx,
 				req_info->vq_info.req_len);
 	virtio_vq_endchains(vq, 1);
-	ipu4_virtio_be_req_queue_put(req_info);
+	kfree(req_info);
 	spin_unlock_irqrestore(&be->slock, flags);
 
 	return 0;
