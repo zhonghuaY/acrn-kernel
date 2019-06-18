@@ -39,18 +39,6 @@ static unsigned int num_stream_support = IPU_ISYS_NUM_STREAMS;
 module_param(num_stream_support, uint, 0660);
 MODULE_PARM_DESC(num_stream_support, "IPU project support number of stream");
 
-static bool csi_watchdog_enable = 1;
-module_param(csi_watchdog_enable, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(csi_watchdog_enable, "IPU4 CSI watchdog enable");
-
-static unsigned int csi_watchdog_timeout = 500;
-module_param(csi_watchdog_timeout, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(csi_watchdog_timeout, "IPU4 CSI watchdog timeout");
-
-static bool use_stream_stop;
-module_param(use_stream_stop, bool, 0660);
-MODULE_PARM_DESC(use_stream_stop, "Use STOP command if running in CSI capture mode");
-
 const struct ipu_isys_pixelformat ipu_isys_pfmts_be_soc[] = {
 	{V4L2_PIX_FMT_Y10, 16, 10, 0, MEDIA_BUS_FMT_Y10_1X10,
 	 IPU_FW_ISYS_FRAME_FORMAT_RAW16},
