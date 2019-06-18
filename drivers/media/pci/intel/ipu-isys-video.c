@@ -39,18 +39,6 @@ static unsigned int num_stream_support = IPU_ISYS_NUM_STREAMS;
 module_param(num_stream_support, uint, 0660);
 MODULE_PARM_DESC(num_stream_support, "IPU project support number of stream");
 
-static bool csi_watchdog_enable = 1;
-module_param(csi_watchdog_enable, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(csi_watchdog_enable, "IPU4 CSI watchdog enable");
-
-static unsigned int csi_watchdog_timeout = 500;
-module_param(csi_watchdog_timeout, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(csi_watchdog_timeout, "IPU4 CSI watchdog timeout");
-
-static bool use_stream_stop;
-module_param(use_stream_stop, bool, 0660);
-MODULE_PARM_DESC(use_stream_stop, "Use STOP command if running in CSI capture mode");
-
 const struct ipu_isys_pixelformat ipu_isys_pfmts_be_soc[] = {
 	{V4L2_PIX_FMT_Y10, 16, 10, 0, MEDIA_BUS_FMT_Y10_1X10,
 	 IPU_FW_ISYS_FRAME_FORMAT_RAW16},
@@ -1372,9 +1360,11 @@ static void stop_streaming_firmware(struct ipu_isys_video *av)
 
 	reinit_completion(&ip->stream_stop_completion);
 
+#ifdef ICI_ENABLED
 	/* Use STOP command if running in CSI capture mode */
 	if (use_stream_stop)
 		send_type = IPU_FW_ISYS_SEND_TYPE_STREAM_STOP;
+#endif
 
 	mutex_lock(&av->isys->mutex);
 	rval = ipu_fw_isys_simple_cmd(av->isys, ip->stream_handle,
@@ -1625,12 +1615,6 @@ int ipu_isys_video_set_streaming(struct ipu_isys_video *av,
 	}
 
 	if (!state) {
-		if (ip->csi2) {
-			if (csi_watchdog_enable)
-				ipu_isys_csi2_stop_wdt(ip->csi2);
-			ip->csi2->current_owner = NULL;
-		}
-
 		stop_streaming_firmware(av);
 
 		/* stop external sub-device now. */
@@ -1714,14 +1698,6 @@ int ipu_isys_video_set_streaming(struct ipu_isys_video *av,
 			rval = v4l2_subdev_call(esd, video, s_stream, state);
 		if (rval)
 			goto out_media_entity_stop_streaming_firmware;
-
-		if (ip->csi2) {
-			ip->csi2->current_owner = current;
-			ip->csi2->error_signal_send = false;
-			if (csi_watchdog_enable)
-				ipu_isys_csi2_start_wdt(ip->csi2,
-				csi_watchdog_timeout);
-		}
 
 	} else {
 		close_streaming_firmware(av);
