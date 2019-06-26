@@ -22,6 +22,21 @@
 	container_of(put_entry, struct ici_frame_buf_wrapper,\
 		put_frame_entry)
 
+static u64 tsc_ticks_to_ns(u64 ticks)
+{
+	u64 ns = ticks * 10000;
+	/*
+	 * TSC clock frequency is 19.2MHz,
+	 * converting TSC tick count to ns is calculated by:
+	 * ns = ticks * 1000 000 000 / 19.2Mhz
+	 *    = ticks * 1000 000 000 / 19200000Hz
+	 *    = ticks * 10000 / 192 ns
+	 */
+	do_div(ns, 192);
+
+	return ns;
+}
+
 static u64 get_sof_ns_delta(struct ici_isys_pipeline *ip,
 	struct ia_css_isys_resp_info *info)
 {
@@ -35,7 +50,7 @@ static u64 get_sof_ns_delta(struct ici_isys_pipeline *ip,
 	else
 		delta = 0;
 
-	return ipu_buttress_tsc_ticks_to_ns(delta);
+	return tsc_ticks_to_ns(delta);
 }
 
 static unsigned int
