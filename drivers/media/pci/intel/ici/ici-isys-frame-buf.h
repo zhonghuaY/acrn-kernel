@@ -88,10 +88,10 @@ struct ici_isys_frame_buf_list {
 
 	uint32_t css_pin_type;
 	unsigned int fw_output;
-	spinlock_t lock;
+	struct mutex mutex;
+	struct mutex short_packet_queue_mutex;
 	wait_queue_head_t wait;
 	struct ici_stream_device *strm_dev;
-	spinlock_t short_packet_queue_lock;
 	struct list_head short_packet_incoming;
 	struct list_head short_packet_active;
 	struct ici_frame_short_buf* short_packet_bufs;

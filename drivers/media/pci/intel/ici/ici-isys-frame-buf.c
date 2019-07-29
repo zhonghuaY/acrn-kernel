@@ -75,9 +75,8 @@ static struct ici_frame_buf_wrapper
 	struct ici_frame_buf_wrapper *buf;
 	int i;
 	int mem_type = user_frame_info->mem_type;
-	unsigned long flags = 0;
 
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 	list_for_each_entry(buf, &buf_list->getbuf_list, node) {
 		for (i = 0; i < user_frame_info->num_planes; i++) {
 			struct ici_frame_plane *new_plane =
@@ -93,7 +92,7 @@ static struct ici_frame_buf_wrapper
 			case ICI_MEM_USERPTR:
 				if (new_plane->mem.userptr ==
 					cur_plane->mem.userptr) {
-					spin_unlock_irqrestore(&buf_list->lock, flags);
+					mutex_unlock(&buf_list->mutex);
 					*buf_list_type=ICI_ISYS_GETBUF_LIST;
 					return buf;
 				}
@@ -101,7 +100,7 @@ static struct ici_frame_buf_wrapper
 			case ICI_MEM_DMABUF:
 				if (new_plane->mem.dmafd ==
 					cur_plane->mem.dmafd) {
-					spin_unlock_irqrestore(&buf_list->lock, flags);
+					mutex_unlock(&buf_list->mutex);
 					*buf_list_type=ICI_ISYS_GETBUF_LIST;
 					return buf;
 				}
@@ -123,7 +122,7 @@ static struct ici_frame_buf_wrapper
 			case ICI_MEM_USERPTR:
 				if (new_plane->mem.userptr ==
 					cur_plane->mem.userptr) {
-					spin_unlock_irqrestore(&buf_list->lock, flags);
+					mutex_unlock(&buf_list->mutex);
 					*buf_list_type=ICI_ISYS_PUTBUF_LIST;
 					return buf;
 				}
@@ -131,7 +130,7 @@ static struct ici_frame_buf_wrapper
 			case ICI_MEM_DMABUF:
 				if (new_plane->mem.dmafd ==
 					cur_plane->mem.dmafd) {
-					spin_unlock_irqrestore(&buf_list->lock, flags);
+					mutex_unlock(&buf_list->mutex);
 					*buf_list_type=ICI_ISYS_PUTBUF_LIST;
 					return buf;
 				}
@@ -139,7 +138,7 @@ static struct ici_frame_buf_wrapper
 			}
 		}
 	}
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 	*buf_list_type=ICI_ISYS_NONE;
 	return NULL;
 }
@@ -576,10 +575,10 @@ int ici_isys_get_buf(struct ici_isys_stream *as,
 		break;
 	}
 
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 	buf->state = ICI_BUF_PREPARED;
 	list_add_tail(&buf->node, &buf_list->getbuf_list);
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 	return 0;
 
 err_exit:
@@ -593,7 +592,6 @@ int ici_isys_get_buf_virt(struct ici_isys_stream *as,
 {
 	int res;
 	unsigned i;
-	unsigned long flags = 0;
 	struct ici_frame_buf_wrapper *buf;
 	ici_frame_buf_list_type buf_list_type;
 
@@ -653,10 +651,10 @@ int ici_isys_get_buf_virt(struct ici_isys_stream *as,
 		break;
 	}
 
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 	buf->state = ICI_BUF_PREPARED;
 	list_add_tail(&buf->node, &buf_list->getbuf_list);
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 	return 0;
 }
 
@@ -667,25 +665,24 @@ int ici_isys_put_buf(struct ici_isys_stream *as,
 	struct ici_frame_buf_wrapper *buf;
 	struct ici_frame_buf_wrapper *buf_safe;
 	struct ici_isys_frame_buf_list *buf_list = &as->buf_list;
-	unsigned long flags = 0;
 	int rval;
 
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 	if (list_empty(&buf_list->putbuf_list)) {
 		/* Wait */
 		if (!(f_flags & O_NONBLOCK)) {
-			spin_unlock_irqrestore(&buf_list->lock, flags);
+			mutex_unlock(&buf_list->mutex);
 			rval = wait_event_interruptible(buf_list->wait,
 							!list_empty(&buf_list->
 								putbuf_list));
 			if (rval == -ERESTARTSYS)
 				return rval;
-			spin_lock_irqsave(&buf_list->lock, flags);
+			mutex_lock(&buf_list->mutex);
 		}
 	}
 
 	if (list_empty(&buf_list->putbuf_list)) {
-		spin_unlock_irqrestore(&buf_list->lock, flags);
+		mutex_unlock(&buf_list->mutex);
 		return -ENODATA;
 	}
 
@@ -702,7 +699,7 @@ int ici_isys_put_buf(struct ici_isys_stream *as,
 			break;
 		}
 	}
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 
 	return 0;
 }
@@ -711,11 +708,10 @@ static void frame_buf_done(
 	struct ici_isys_frame_buf_list *buf_list,
 	struct ici_frame_buf_wrapper *buf)
 {
-	unsigned long flags = 0;
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 	buf->state = ICI_BUF_READY;
 	list_add_tail(&buf->node, &buf_list->putbuf_list);
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 	wake_up_interruptible(&buf_list->wait);
 	pr_debug("%s: Frame data arrived! %lu", __func__,
 		buf->frame_info.frame_planes[0].mem.userptr);
@@ -749,13 +745,12 @@ void ici_isys_frame_buf_ready(struct ici_isys_pipeline
 		ici_pipeline_to_stream(ip);
 	struct ici_isys_frame_buf_list *buf_list = &as->buf_list;
 	struct ici_isys *isys = as->isys;
-	unsigned long flags = 0;
 	bool found = false;
 
 	dev_dbg(&isys->adev->dev, "buffer: received buffer %8.8x\n",
 		info->pin.addr);
 
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 
 	list_for_each_entry_reverse(buf, &buf_list->getbuf_list, node) {
 		struct ici_kframe_plane* plane;
@@ -770,14 +765,14 @@ void ici_isys_frame_buf_ready(struct ici_isys_pipeline
 	}
 
 	if (!found) {
-		spin_unlock_irqrestore(&buf_list->lock, flags);
+		mutex_unlock(&buf_list->mutex);
 		dev_err(&isys->adev->dev,
 			"WARNING: cannot find a matching video buffer!\n");
 		return;
 	}
 
 	list_del(&buf->node);
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 
 	ici_isys_buf_calc_sequence_time(buf, ip, info);
 
@@ -787,10 +782,9 @@ void ici_isys_frame_buf_ready(struct ici_isys_pipeline
 	 * information is available only at that time.
 	 */
 	if (ip->interlaced) {
-		spin_lock_irqsave(&buf_list->short_packet_queue_lock, flags);
+		mutex_lock(&buf_list->short_packet_queue_mutex);
 		list_add(&buf->node, &buf_list->interlacebuf_list);
-		spin_unlock_irqrestore(&buf_list->short_packet_queue_lock,
-					   flags);
+		mutex_unlock(&buf_list->short_packet_queue_mutex);
 	} else {
 		buf->frame_info.field = ICI_FIELD_NONE;
 		frame_buf_done(buf_list, buf);
@@ -852,46 +846,39 @@ void ici_isys_frame_buf_stream_cancel(struct
 	struct ici_isys_frame_buf_list *buf_list = &as->buf_list;
 	struct ici_frame_buf_wrapper *buf;
 	struct ici_frame_buf_wrapper *bufsafe;
-	unsigned long flags = 0;
 
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 	list_for_each_entry_safe(buf, bufsafe,
 				&buf_list->getbuf_list, node) {
 		list_del(&buf->node);
-		spin_unlock_irqrestore(&buf_list->lock, flags);
 		dev_dbg(&buf_list->strm_dev->dev, "buf: %p\n", buf);
 		if (as->strm_dev.virt_dev_id < 0)
 			unmap_buf(buf);
 		else
 			unmap_buf_virt(buf);
-		spin_lock_irqsave(&buf_list->lock, flags);
 	}
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 	list_for_each_entry_safe(buf, bufsafe,
 				&buf_list->putbuf_list, node) {
 		list_del(&buf->node);
-		spin_unlock_irqrestore(&buf_list->lock, flags);
 		dev_dbg(&buf_list->strm_dev->dev, "buf: %p\n", buf);
 		if (as->strm_dev.virt_dev_id < 0)
 			unmap_buf(buf);
 		else
 			unmap_buf_virt(buf);
-		spin_lock_irqsave(&buf_list->lock, flags);
 	}
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 
-	spin_lock_irqsave(&buf_list->short_packet_queue_lock, flags);
+	mutex_lock(&buf_list->mutex);
 	list_for_each_entry_safe(buf, bufsafe,
 				&buf_list->interlacebuf_list, node) {
 		list_del(&buf->node);
-		spin_unlock_irqrestore(&buf_list->short_packet_queue_lock, flags);
 		dev_dbg(&buf_list->strm_dev->dev, "buf: %p\n", buf);
 		unmap_buf(buf);
-		spin_lock_irqsave(&buf_list->short_packet_queue_lock, flags);
 	}
-	spin_unlock_irqrestore(&buf_list->short_packet_queue_lock, flags);
+	mutex_unlock(&buf_list->mutex);
 }
 
 int ici_isys_frame_buf_add_next(
@@ -900,10 +887,9 @@ int ici_isys_frame_buf_add_next(
 {
 	struct ici_frame_buf_wrapper *buf = NULL;
 	struct ici_isys_frame_buf_list *buf_list = &as->buf_list;
-	unsigned long flags = 0;
 	bool found = false;
 
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 
 	list_for_each_entry(buf, &buf_list->getbuf_list, node) {
 		if (buf->state == ICI_BUF_PREPARED){
@@ -919,7 +905,7 @@ int ici_isys_frame_buf_add_next(
 
 
 	buf->state = ICI_BUF_ACTIVE;
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 
 	pr_debug("%s: add buf to FW! %lu", __func__,
 		buf->frame_info.frame_planes[0].mem.userptr);
@@ -940,14 +926,13 @@ int ici_isys_frame_buf_add_next(
 		struct ici_frame_short_buf* sb;
 		struct ici_isys_mipi_packet_header* ph;
 		struct ia_css_isys_output_pin_payload *output_pin;
-		spin_lock_irqsave(&buf_list->short_packet_queue_lock, flags);
+		mutex_lock(&buf_list->mutex);
 		if (!list_empty(&buf_list->short_packet_incoming)) {
 			sb = list_entry(buf_list->short_packet_incoming.next,
 				struct ici_frame_short_buf, node);
 			list_del(&sb->node);
 			list_add_tail(&sb->node, &buf_list->short_packet_active);
-			spin_unlock_irqrestore(&buf_list->short_packet_queue_lock,
-				flags);
+			mutex_unlock(&buf_list->short_packet_queue_mutex);
 
 			ph = (struct ici_isys_mipi_packet_header*)
 				sb->buffer;
@@ -960,8 +945,7 @@ int ici_isys_frame_buf_add_next(
 			output_pin->addr = sb->dma_addr;
 			output_pin->out_buf_id = sb->buf_id + 1;
 		} else {
-			spin_unlock_irqrestore(&buf_list->short_packet_queue_lock,
-				flags);
+			mutex_unlock(&buf_list->short_packet_queue_mutex);
 			dev_err(&as->isys->adev->dev,
 				"No more short packet buffers. Driver bug?");
 			WARN_ON(1);
@@ -970,7 +954,7 @@ int ici_isys_frame_buf_add_next(
 	return 0;
 
 cleanup_spinlock:
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 	return -ENODATA;
 }
 
@@ -983,13 +967,12 @@ void ici_isys_frame_buf_capture_done(
 			ici_pipeline_to_stream(ip);
 		struct ici_isys_frame_buf_list *buf_list =
 			&as->buf_list;
-		unsigned long flags = 0;
 		struct ici_frame_short_buf* sb;
 		struct ici_frame_buf_wrapper* buf;
 		struct ici_frame_buf_wrapper* buf_safe;
 		struct list_head list;
 
-		spin_lock_irqsave(&buf_list->short_packet_queue_lock, flags);
+		mutex_lock(&buf_list->short_packet_queue_mutex);
 		if(ip->short_packet_source == IPU_ISYS_SHORT_PACKET_FROM_RECEIVER)
 			if (!list_empty(&buf_list->short_packet_active)) {
 			sb = list_last_entry(&buf_list->short_packet_active,
@@ -1000,8 +983,7 @@ void ici_isys_frame_buf_capture_done(
 		list_cut_position(&list,
 				  &buf_list->interlacebuf_list,
 				  buf_list->interlacebuf_list.prev);
-		spin_unlock_irqrestore(&buf_list->short_packet_queue_lock,
-					   flags);
+		mutex_unlock(&buf_list->short_packet_queue_mutex);
 
 		list_for_each_entry_safe(buf, buf_safe, &list, node) {
 			buf->frame_info.field = ip->cur_field;
@@ -1019,13 +1001,11 @@ void ici_isys_frame_short_packet_ready(
 		ici_pipeline_to_stream(ip);
 	struct ici_isys_frame_buf_list *buf_list =
 		&as->buf_list;
-	unsigned long flags = 0;
 	struct ici_frame_short_buf* sb;
 
-	spin_lock_irqsave(&buf_list->short_packet_queue_lock, flags);
+	mutex_lock(&buf_list->short_packet_queue_mutex);
 	if (list_empty(&buf_list->short_packet_active)) {
-		spin_unlock_irqrestore(&buf_list->short_packet_queue_lock,
-			flags);
+		mutex_unlock(&buf_list->short_packet_queue_mutex);
 		dev_err(&as->isys->adev->dev,
 			"active short buffer queue empty\n");
 		return;
@@ -1041,7 +1021,7 @@ void ici_isys_frame_short_packet_ready(
 			break;
 		}
 	}
-	spin_unlock_irqrestore(&buf_list->short_packet_queue_lock, flags);
+	mutex_unlock(&buf_list->short_packet_queue_mutex);
 }
 
 void ici_isys_frame_buf_short_packet_destroy(
@@ -1145,8 +1125,8 @@ int ici_isys_frame_buf_init(
 	struct ici_isys_frame_buf_list* buf_list)
 {
 	buf_list->drv_priv = NULL;
-	spin_lock_init(&buf_list->lock);
-	spin_lock_init(&buf_list->short_packet_queue_lock);
+	mutex_init(&buf_list->mutex);
+	mutex_init(&buf_list->short_packet_queue_mutex);
 	INIT_LIST_HEAD(&buf_list->getbuf_list);
 	INIT_LIST_HEAD(&buf_list->putbuf_list);
 	INIT_LIST_HEAD(&buf_list->interlacebuf_list);

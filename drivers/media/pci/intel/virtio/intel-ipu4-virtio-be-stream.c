@@ -228,9 +228,9 @@ int process_poll(struct ipu4_virtio_req_info *req_info)
 
 	as = dev_to_stream(sn->f->private_data);
 
-	spin_lock_irqsave(&as->buf_list.lock, flags);
+	mutex_lock(&as->buf_list.mutex);
 	empty = list_empty(&as->buf_list.putbuf_list);
-	spin_unlock_irqrestore(&as->buf_list.lock, flags);
+	mutex_unlock(&as->buf_list.mutex);
 	if (!empty) {
 		req->func_ret = 1;
 		pr_debug("%s: done", __func__);

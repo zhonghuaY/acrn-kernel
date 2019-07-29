@@ -348,10 +348,10 @@ struct ici_frame_buf_wrapper *get_buf(struct virtual_stream *vstream, struct ici
 
 		break;
 	}
-	spin_lock_irqsave(&buf_list->lock, flags);
+	mutex_lock(&buf_list->mutex);
 	buf->state = ICI_BUF_PREPARED;
 	list_add_tail(&buf->uos_node, &buf_list->getbuf_list);
-	spin_unlock_irqrestore(&buf_list->lock, flags);
+	mutex_unlock(&buf_list->mutex);
 	return buf;
 }
 
@@ -878,8 +878,8 @@ static void base_device_release(struct device *sd)
 int virt_frame_buf_init(struct ici_isys_frame_buf_list *buf_list)
 {
 	buf_list->drv_priv = NULL;
-	spin_lock_init(&buf_list->lock);
-	spin_lock_init(&buf_list->short_packet_queue_lock);
+	mutex_init(&buf_list->mutex);
+	mutex_init(&buf_list->short_packet_queue_mutex);
 	INIT_LIST_HEAD(&buf_list->getbuf_list);
 	INIT_LIST_HEAD(&buf_list->putbuf_list);
 	INIT_LIST_HEAD(&buf_list->interlacebuf_list);
