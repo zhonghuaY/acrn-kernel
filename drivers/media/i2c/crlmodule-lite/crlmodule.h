@@ -111,4 +111,9 @@ struct crl_sensor {
 #define to_crlmodule_sensor(_sd)	\
 	(to_crlmodule_subdev(_sd)->sensor)
 
+   int crlmodule_i2c_read(struct crl_sensor *sensor, u16 dev_i2c_addr, u16 reg,
+						  u8 len, u32 *val);
+   int crlmodule_i2c_write(struct crl_sensor *sensor, u16 dev_i2c_addr,
+						   u16 reg, u8 len, u32 val);
+   
 #endif /* __CRLMODULE_PRIV_H_ */

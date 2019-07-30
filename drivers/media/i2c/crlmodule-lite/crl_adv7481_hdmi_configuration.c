@@ -12,6 +12,9 @@
 #include <linux/mutex.h>
 #include "crlmodule.h"
 #include "crlmodule-regs.h"
+#include <linux/string.h>
+#include <linux/delay.h>
+
 
 #define CREATE_ATTRIBUTE(attr)                                          \
         if (device_create_file(&client->dev, &attr) != 0) {             \
@@ -339,6 +342,54 @@ static ssize_t adv_reauthenticate_store(struct device *dev, struct device_attrib
 /* Declares reauthenticate attribute that will be exposed to user space via sysfs */
 static DEVICE_ATTR(reauthenticate, S_IWUSR | S_IWGRP, NULL, adv_reauthenticate_store);
 
+// echo "w dev_i2c_addr reg len val " > debug_reg
+// echo "r dev_i2c_addr reg len  " > debug_reg
+// echo "r 0xE0 0xF4 1 " > debug_reg
+// echo "w 0xE0 0xF4 1 0x2c" > debug_reg
+static ssize_t adv_reg_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
+	struct ici_ext_subdev *sd =
+		i2c_get_clientdata(client);
+	struct crl_sensor *sensor = to_crlmodule_sensor(sd);
+	u16 dev_i2c_addr;
+	u16 reg;
+	u8 len;
+	u32 val;
+	char write_flag ;
+	int match, ret;
+	
+	{
+		unsigned int sdev_i2c_addr;
+		unsigned int sreg;
+		unsigned int slen;
+		unsigned int sval;
+
+		match = sscanf(buf, "%c 0x%x 0x%x %d 0x%x", &write_flag, &sdev_i2c_addr, &sreg, &slen, &sval);
+		//printk("write_flag:%c, dev_i2c_addr:0x%x, reg:0x%x len:%d, val:0x%x\n", write_flag, sdev_i2c_addr, sreg, slen, sval);
+		dev_i2c_addr = (u16) sdev_i2c_addr;
+		reg = (u16) sreg;
+		len = (u8) slen;
+		val = sval;
+	}
+	
+	if(write_flag == 'w' && match == 5) {
+		ret = crlmodule_i2c_write(sensor, dev_i2c_addr, reg, len, val);
+		dev_info(&client->dev,"wrote dev_i2c_addr:0x%x reg:0x%x value:0x%x ret:%d\n", dev_i2c_addr, reg, val, ret);
+	} else if(write_flag == 'r' && match == 4){
+		ret = crlmodule_i2c_read(sensor, dev_i2c_addr, reg, len, &val);
+		//dev_info(&client->dev,"read dev_i2c_addr:0x%x reg:0x%x value:0x%x ret:%d\n", dev_i2c_addr, reg, val, ret);
+		dev_info(&client->dev,"0x%x 0x%x 0x%x\n", dev_i2c_addr, reg, val);
+	}
+	
+	
+	return count;
+}
+
+/* Declares reauthenticate attribute that will be exposed to user space via sysfs */
+static DEVICE_ATTR(debug_reg, S_IWUSR | S_IWGRP, NULL, adv_reg_store);
+
+
 /* Dummy show to prevent WARN when registering aksv attribute */
 static ssize_t adv_aksv_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -596,7 +647,7 @@ int adv7481_sensor_init(struct i2c_client *client)
 	CREATE_ATTRIBUTE(dev_attr_bksv);
 	CREATE_ATTRIBUTE(dev_attr_reauthenticate);
 	CREATE_ATTRIBUTE(dev_attr_bstatus);
-
+	CREATE_ATTRIBUTE(dev_attr_debug_reg);
 	return 0;
 }
 
@@ -614,6 +665,7 @@ int adv7481_sensor_cleanup(struct i2c_client *client)
 	        destroy_workqueue(irq_workqueue);
 		irq_workqueue = NULL;
 	}
+	REMOVE_ATTRIBUTE(dev_attr_debug_reg);
 	REMOVE_ATTRIBUTE(dev_attr_bstatus);
 	REMOVE_ATTRIBUTE(dev_attr_reauthenticate);
 	REMOVE_ATTRIBUTE(dev_attr_bksv);

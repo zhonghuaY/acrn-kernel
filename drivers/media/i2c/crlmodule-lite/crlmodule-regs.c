@@ -9,7 +9,7 @@
 #include "crlmodule-nvm.h"
 #include "crlmodule-regs.h"
 
-static int crlmodule_i2c_read(struct crl_sensor *sensor, u16 dev_i2c_addr, u16 reg,
+int crlmodule_i2c_read(struct crl_sensor *sensor, u16 dev_i2c_addr, u16 reg,
 			      u8 len, u32 *val)
 {
 	struct i2c_client *client = sensor->src->sd.client;
@@ -77,15 +77,16 @@ static int crlmodule_i2c_read(struct crl_sensor *sensor, u16 dev_i2c_addr, u16 r
 		break;
 	}
 
+	dev_dbg(&client->dev, "dev_addr:0x%x read from offset 0x%x value=0x%x\n", dev_i2c_addr, reg, *val);
 	return 0;
 
 err:
-	dev_err(&client->dev, "read from offset 0x%x error %d\n", reg, r);
+	dev_err(&client->dev, "dev_addr:%d read from offset 0x%x error %d\n", dev_i2c_addr, reg, r);
 
 	return r;
 }
 
-static int crlmodule_i2c_write(struct crl_sensor *sensor, u16 dev_i2c_addr,
+int crlmodule_i2c_write(struct crl_sensor *sensor, u16 dev_i2c_addr,
 			       u16 reg, u8 len, u32 val)
 {
 	struct i2c_client *client = sensor->src->sd.client;
@@ -122,8 +123,8 @@ static int crlmodule_i2c_write(struct crl_sensor *sensor, u16 dev_i2c_addr,
 		data_offset = &data[2];
 	}
 
-	dev_dbg(&client->dev, "%s len reg, val: [%d, 0x%04x, 0x%04x]",
-			       __func__, len, reg, val);
+	dev_dbg(&client->dev, "%s dev_i2c_addr len reg, val: [0x%x, %d, 0x%04x, 0x%04x]",
+			       __func__, dev_i2c_addr, len, reg, val);
 
 	switch (len) {
 	case CRL_REG_LEN_08BIT:

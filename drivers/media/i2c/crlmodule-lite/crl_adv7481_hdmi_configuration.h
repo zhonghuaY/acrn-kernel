@@ -180,6 +180,7 @@ static struct crl_register_write_rep adv7481_hdmi_mode_rgb888[] = {
 };
 
 static struct crl_register_write_rep adv7481_hdmi_mode_uyvy[] = {
+	{0x3E, CRL_REG_LEN_08BIT, 0x08, 0x44}, /* Invert order of Cb and Cr*/
 	{0x04, CRL_REG_LEN_08BIT, 0x00, 0xE0}, //YCrCb output
 	{0x12, CRL_REG_LEN_08BIT, 0xF2, 0xE0}, //CSC Depends on ip Packets - SDR422 set
 	{0x17, CRL_REG_LEN_08BIT, 0x80, 0xE0}, //Luma & Chroma Values Can Reach 254d
